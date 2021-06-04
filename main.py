@@ -5,9 +5,8 @@ import matplotlib.pyplot as plt
 
 N = 13
 U = 100
-W_VALUES = [10 * x for x in range(1, 25)]
+W_VALUES = [10 * x for x in range(25)]
 NUM_MCs = 500
-TIME_INCR = .00025
 
 class MC_tube_list:
     def __init__(self, ntubes, n, u, w):
@@ -19,9 +18,8 @@ class MC_tube_list:
         """
         self.ntubes = ntubes
         self.n = n
-        self.u = u * TIME_INCR
-        self.w = w * TIME_INCR
-        self.state = n
+        self.u = u
+        self.w = w
 
     # def simulate_mc(self):
     #     """
@@ -58,30 +56,34 @@ class MC_tube_list:
         :return: first passage time of the microtubule to the catastrophe state (0). If the state is not reached
         by the time MAX_TIME, returns 0.
         """
-        if self.u + self.w > 1 or self.u < 0 or self.w < 0 or self.n < 2:
+        if self.n < 2:
             print("ERROR: parameters are not set correctly")
 
         times = []
         for i in range(self.ntubes):
             time = 0
+            state = self.n
             while(True):
-                decrement_prob = (self.state * self.u) * TIME_INCR
-                increment_prob = (self.n - self.state) * self.w * TIME_INCR
-                reaction_prob = decrement_prob + increment_prob
+                decrement_rate = state * self.u
+                increment_rate = (self.n - state) * self.w
+                reaction_rate = decrement_rate + increment_rate
+
+
 
                 rand_t = random.random()
                 rand_r = random.random()
 
-                rxn_time = (1 / reaction_prob) * np.log(1 / rand_t) * TIME_INCR
+                rxn_time = (1 / reaction_rate) * np.log(1 / rand_t)
                 time += rxn_time
-
-                if (rand_r < (decrement_prob / reaction_prob)):
-                    self.state -= 1
-                    if self.state == 0:
-                        times.append(time)
-                        break
+                if rand_r < decrement_rate / reaction_rate:
+                    state -= 1
                 else:
-                    self.state += 1
+                    state += 1
+
+                if state == 0:
+                    times.append(time)
+                    break
+
         return times
 
 
