@@ -109,4 +109,7 @@ def plot_simulation():
     plt.plot("W value", "Average time", data=d)
     plt.show()
 
-plot_simulation()
+def plot_c():
+    f = open("result.txt", "r")
+
+plot_c()
