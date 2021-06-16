@@ -1,66 +1,193 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <pthread.h>
+#include <sys/time.h>
+#include <stdbool.h>
+#include "/Users/Alex/Downloads/mt19937-64/mt19937-64.c"
+
 #define N 13
-#define U 100
-#define NUM_MCS 50000
+#define U_EXP 16
+#define W_EXP 20
+#define FWD_FINAL_STATE 0
+#define REV_FINAL_STATE 4
+
+#define NUM_MCS 100000
+
+// pthread_mutex_t mutex;
+
 
 struct MC_tube_list {
+    int id;
     int ntubes;
-    double u;
-    double w;
+    int u;
+    int w;
+    int cur;
+    
+   
+
 };
 
-int
-simulate_gillespie (struct MC_tube_list mc) 
+/**
+* Generation of random number seed, get a current time in micri-second unit
+**/
+
+
+int 
+gus() 
 {
+    struct timeval tp;
+    gettimeofday(&tp,0);
+    return (tp.tv_usec);
+}
+
+void *
+simulate_gillespie (void *ptr, int w_val, bool fwd, int dist_w_val) 
+{
+    (void) ptr;
+    struct MC_tube_list mc = *(struct MC_tube_list *) ptr;
+    
     FILE *result;
-    int state = N;
+    FILE *fano;
+
     double time;
+    
     double decrement_rate;
     double increment_rate;
     double reaction_rate;
-    int i;
+    
     double randt;
     double randr;
     double rxn_time;
 
-    result = fopen("result.txt", "w");
-    for (i = 0; i < mc.ntubes; i++) {
+    double average_time;
+    double variance;
+    double second_moment;
+    double fano_factor;
+    int state;
+    int initial_state;
+    int final_state;
+    if (fwd){
+        result = fopen("result.txt", "a");
+        fano = fopen("fano.txt", "a");
+        initial_state = 4;
+        final_state = 0;
+    }
+        
+    else{
+        result = fopen("revresult.txt", "a");
+        fano = fopen("revfano.txt", "a");
+        initial_state = 0;
+        final_state = 4;
+    }
+       
+    
+    average_time = 0;
+    second_moment = 0;
+    unsigned long long idum;
+    idum=gus();
+    init_genrand64(idum);
+
+    mc.ntubes = NUM_MCS;
+    mc.u = U_EXP;
+    mc.w = w_val;
+    mc.cur = 0;
+
+    printf("W = %d\n", w_val);
+
+    while (mc.cur < mc.ntubes) {
         time = 0;
+        state = initial_state;
+       
         while(1) {
             decrement_rate = (double) state * mc.u;
             increment_rate = (double) (N - state) * mc.w;
+            
             reaction_rate = decrement_rate + increment_rate;
+            
+            
+            randt = genrand64_real2();
 
-            randt = (double) rand() / (RAND_MAX);
-            randr = (double) rand() / (RAND_MAX);
-
+            
+            randr = genrand64_real2();
+            while (!randt)
+                randt = genrand64_real2();
+            if (!randr)
+                randr = genrand64_real2();
             rxn_time = (1 / reaction_rate * log(1 / randt));
+            
             time += rxn_time;
-            if (randr < decrement_rate / reaction_rate) 
+            if (randr < decrement_rate / reaction_rate) {
                 state--;
+            }
             else
                 state++;
-            if (!state) {
-                if (i == mc.ntubes)
-                    fprintf(result, "%f", time);
-                else
+            if (state == final_state) {
+                average_time += (time / NUM_MCS);
+                second_moment += (time * time / NUM_MCS);
+                mc.cur++;
+                // pthread_mutex_lock(&mutex);
+                if (mc.w == dist_w_val)
                     fprintf(result, "%f, ", time);
+                // pthread_mutex_unlock(&mutex);
+                if (!(mc.cur % 10000))
+                    printf("%d\n", mc.cur);
                 break;
             }
         }
     }
-    return (0);
+    variance = second_moment - (average_time * average_time);
+    fano_factor = variance / (average_time * average_time);
+    fprintf(fano, "W = %d, MEAN: %f, VARIANCE: %f, FANO FACTOR: %f\n", mc.w, average_time, variance, fano_factor);
+    return (NULL);
+}
+
+void *
+rng_tester(void *ptr) 
+{
+    FILE *rng;
+    int i;
+    
+    (void) ptr;
+    rng = fopen("rng.txt", "a");
+    
+    unsigned long long idum;
+    idum=gus();
+    init_genrand64(idum);
+
+    for (i = 0; i < 10000; i++)
+        fprintf(rng, "%f\n", genrand64_real2());
+    return (NULL);
 }
 
 int
 main(int argc, char **argv) {
     (void) argc;
     (void) argv;
+    fopen("result.txt", "w");
+    fopen("fano.txt", "w");
+    fopen("revresult.txt", "w");
+    fopen("revfano.txt", "w");
+    fopen("rng.txt", "w");
+    int w;
+    // double w;
 
-    int u_exp = 100;
-    int w_exp = 170;
-    struct MC_tube_list mc = {NUM_MCS, u_exp, w_exp};
-    simulate_gillespie(mc);
+    // pthread_t tid[8];
+    
+    struct MC_tube_list *mcs = malloc(sizeof(struct MC_tube_list));
+
+    // int i;
+
+    // pthread_mutex_init(&mutex, NULL);
+    
+    // for (i = 0; i < 8; i++){
+    //     mcs[i] = malloc(sizeof(struct MC_tube_list));
+    //     pthread_create(&tid[i], NULL, simulate_gillespie, &mcs[i]);
+    // }
+    // for (i = 0; i < 8; i++)
+    //     pthread_join(tid[i], NULL);
+
+    // pthread_mutex_destroy(&mutex);
+    for (w = 2; w < 50; w++)
+        simulate_gillespie(mcs, w, false, 20);
 }
