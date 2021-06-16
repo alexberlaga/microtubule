@@ -109,7 +109,69 @@ def plot_simulation():
     plt.plot("W value", "Average time", data=d)
     plt.show()
 
+def attempt_float(s):
+    try:
+        x = float(s)
+    except ValueError:
+        x = 10000000
+    return x
+
+
 def plot_c():
-    f = open("result.txt", "r")
+    f = open("revresult.txt", "r")
+    contents = f.readline()
+    data = contents.split(", ")
+    data = data[:-1]
+    data = list(map(attempt_float, data))
+    data = list(filter(lambda x: x < .07 and x > 0, data))
+    data2 = list(filter(lambda x: x < .1, data))
+    # print(data2)
+    data3 = list(map(np.log10, data2))
+    average = np.average(data)
+    variance = np.var(data)
+    fano = variance / (average ** 2)
+    print("Mean: " + str(average))
+    print("Variance: " + str(variance))
+    print("Fano Factor: " + str(fano))
+    # plt.hist(data2, 200)
+    # # plt.ylim(0, 50)
+    # plt.show()
+    # plt.hist(data2, 200)
+    # plt.show()
+    plt.hist(data, 500)
+    plt.show()
+
+def plot_ff():
+    f = open("revfano.txt", "r")
+    d1 = f.readlines()
+    d2 = [d.split(", ") for d in d1]
+    w_vals = []
+    means = []
+    variances = []
+    ffs = []
+    for lst in d2:
+        for d in lst:
+            if d[0] == 'W':
+                w_vals.append(int(d[4:]))
+            elif d[0] == 'M':
+                means.append(float(d[6:]))
+            elif d[0] == 'V':
+                variances.append(float(d[10:]))
+            elif d[0] == 'F':
+                ffs.append(float(d[12:]))
+    frequencies = [1/x for x in means]
+    concs = [x/3.3 for x in w_vals]
+
+    print(w_vals)
+    print(means)
+    plt.plot(concs, means)
+    plt.title("Mean time to rescue as a function of concentration")
+    plt.show()
+    plt.plot(concs, ffs)
+    plt.title("Fano Factor as a function of concentration")
+    plt.show()
+    plt.plot(concs, frequencies)
+    plt.title("Rescue frequency as a function of concentration")
+    plt.show()
 
 plot_c()
